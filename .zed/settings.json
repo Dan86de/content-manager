@@ -1,0 +1,48 @@
+// Folder-specific settings
+//
+// For a full list of overridable settings, and general information on folder-specific settings,
+// see the documentation: https://zed.dev/docs/configuring-zed#settings-files
+{
+  // Generated route tree: exclude from file scanning, the project panel, and search.
+  // (Covers VS Code's files.watcherExclude + search.exclude.)
+  "file_scan_exclusions": ["**/routeTree.gen.ts"],
+
+  // Use Biome to format on save and organize imports, matching the VS Code config.
+  "format_on_save": "on",
+  "code_actions_on_format": {
+    "source.organizeImports.biome": true
+  },
+
+  "languages": {
+    "JavaScript": {
+      "formatter": {
+        "language_server": { "name": "biome" }
+      }
+    },
+    "TypeScript": {
+      "formatter": {
+        "language_server": { "name": "biome" }
+      }
+    },
+    "TSX": {
+      "formatter": {
+        "language_server": { "name": "biome" }
+      }
+    },
+    "JSON": {
+      "formatter": {
+        "language_server": { "name": "biome" }
+      }
+    },
+    "JSONC": {
+      "formatter": {
+        "language_server": { "name": "biome" }
+      }
+    },
+    "CSS": {
+      "formatter": {
+        "language_server": { "name": "biome" }
+      }
+    }
+  }
+}
