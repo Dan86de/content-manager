@@ -46,6 +46,6 @@ unformatted code.
 
 - Summarize what changed and why.
 - Draft a commit message in the **domain language** (an Item is never a "post").
-- If on `main`, propose a new branch prefixed `dan86de/`.
+- If on `main` stay on main, if user wants propose a new branch prefixed `dan86de/`.
 - **Wait for explicit approval** before running `git commit`. Do not push unless
   asked.
