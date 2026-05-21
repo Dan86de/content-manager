@@ -27,9 +27,11 @@ pnpm dev                      # app on :3000
 pnpm test
 ```
 
-The Postgres-backed repository test only runs when `TEST_DATABASE_URL` is set (it
-points at `content_manager_test`). Vitest's `globalSetup` runs `dbmate` to migrate
-that database before the suite.
+The Postgres-backed repository test only runs when `TEST_DATABASE_URL` is set
+(it points at `content_manager_test`) and Postgres is up. It's already in
+`.env` if you copied `.env.example`, and Vitest loads `.env` automatically;
+Vitest's `globalSetup` then runs `dbmate` to create and migrate that database
+before the suite. Without it (e.g. in CI), the repository test is skipped.
 
 ## Checks
 
