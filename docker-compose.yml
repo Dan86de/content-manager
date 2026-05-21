@@ -1,0 +1,37 @@
+# Local-only infra for Content Manager: Postgres (source of truth) + Electric (sync).
+# `docker compose up` runs both alongside the app, which itself runs on the host
+# (it reads the Voice from and writes Drafts into the local Obsidian vault).
+services:
+  postgres:
+    image: postgres:16
+    # Electric needs logical replication; Postgres silently won't sync otherwise.
+    command: ["-c", "wal_level=logical"]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: content_manager
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  electric:
+    image: electricsql/electric:latest
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/content_manager?sslmode=disable
+      # Single-user local tool: no shape auth, insecure mode is intentional.
+      ELECTRIC_INSECURE: "true"
+    # App dev server owns host port 3000, so expose Electric on 3001.
+    ports:
+      - "3001:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

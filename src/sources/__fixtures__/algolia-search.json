@@ -1,0 +1,20 @@
+{
+	"hits": [
+		{
+			"objectID": "111",
+			"title": "Claude Code ships subagents",
+			"url": "https://example.com/claude-code-subagents",
+			"author": "alice",
+			"story_text": null,
+			"created_at_i": 1716206400
+		},
+		{
+			"objectID": "222",
+			"title": "Ask HN: which MCP servers do you actually use?",
+			"url": null,
+			"author": "bob",
+			"story_text": "I'm collecting MCP servers worth installing...",
+			"created_at_i": 1716210000
+		}
+	]
+}
