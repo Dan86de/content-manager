@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { insertNew } from "#/db/repository";
+import { insertNew, setScores, unscoredItems } from "#/db/repository";
+import { loadNiche } from "#/scoring/niche";
+import { scoreItems } from "#/scoring/scorer";
 import { fetchHackerNews } from "#/sources/hackernews";
 import type { NormalizedItem, PerSourceSummary } from "#/sources/types";
 import { HACKERNEWS, HN_KEYWORDS } from "../../sources.config";
@@ -18,10 +20,12 @@ const SOURCES: SourceFetcher[] = [
 ];
 
 /**
- * "Fetch now": pull Items from every Source, insert the new ones, and report a
- * per-Source summary. Each Source is fault-isolated — one failing fetch records
- * its error and the run continues. (Scoring the `score IS NULL` sweep slots in
- * here later.)
+ * "Fetch now": pull Items from every Source, insert the new ones, then score
+ * the whole `score IS NULL` sweep against the Niche, and report a per-Source
+ * summary. Each Source is fault-isolated — one failing fetch records its error
+ * and the run continues. The summary carries no Score count; the live feed,
+ * which Electric streams each persisted batch into, is the only evidence of
+ * scoring.
  */
 export const fetchNow = createServerFn({ method: "POST" }).handler(
 	async (): Promise<PerSourceSummary[]> => {
@@ -40,6 +44,20 @@ export const fetchNow = createServerFn({ method: "POST" }).handler(
 				});
 			}
 		}
+
+		// One global scoring sweep after every Source has been inserted. Each
+		// yielded batch is persisted immediately so Electric streams it into the
+		// feed. Per-batch faults are contained inside scoreItems; this outer guard
+		// is the last resort so a scoring failure never fails the fetch itself.
+		try {
+			const niche = await loadNiche();
+			for await (const batch of scoreItems(await unscoredItems(), niche)) {
+				await setScores(batch);
+			}
+		} catch (error) {
+			console.error("scoring sweep failed", error);
+		}
+
 		return summaries;
 	},
 );

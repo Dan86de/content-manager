@@ -16,10 +16,12 @@ function Feed() {
 	const [isFetching, setIsFetching] = useState(false);
 	const [summaries, setSummaries] = useState<PerSourceSummary[] | null>(null);
 
-	// The feed: every Item, newest first. Ordering lives here, not in the shape.
+	// The feed: most relevant first. Highest Score on top, unscored Items last,
+	// newest-first within a tie. Ordering lives here, not in the shape.
 	const { data: items } = useLiveQuery((q) =>
 		q
 			.from({ item: itemsCollection })
+			.orderBy(({ item }) => item.score, { direction: "desc", nulls: "last" })
 			.orderBy(({ item }) => item.published_at, "desc"),
 	);
 
@@ -102,6 +104,11 @@ function Feed() {
 											>
 												<span className="block truncate">{item.title}</span>
 											</a>
+											{item.score_reason && (
+												<span className="block truncate text-muted-foreground text-xs">
+													{item.score_reason}
+												</span>
+											)}
 										</td>
 										<td className="py-3 pr-4">
 											<span className="rounded-md bg-secondary px-2 py-0.5 font-medium text-secondary-foreground text-xs">

@@ -63,8 +63,10 @@ reason for taking on a sync service rather than plain request/response.
 ### LLM layer — TanStack AI + Anthropic
 TanStack AI (typed streaming + isomorphic tool-calling, native to TanStack Start)
 calls Anthropic with an API key. Two tiers:
-- **Scoring** — Claude Haiku, a single plain call per Item against `niche.md`
-  (high volume, must stay cheap/fast/deterministic).
+- **Scoring** — Claude Haiku, plain (non-agentic) calls batched at ~10 Items each
+  against `niche.md`; each batch entry carries a stable Item id Haiku must echo,
+  and results map back by id, never by array position (high volume, must stay
+  cheap/fast).
 - **Drafting** — Claude Opus as an agent that pulls its own content via TanStack AI
   tools (`fetch-article`, `get-transcript`) before producing the voice-matched Draft.
 
