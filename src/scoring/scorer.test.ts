@@ -69,57 +69,61 @@ describe("parseScores", () => {
 });
 
 describe("scoreItems", () => {
-	it("splits into ~10-Item batches and yields one result set per batch", async () => {
-		const items = makeItems(23);
-		const seenBatchSizes: number[] = [];
-		// Echo a valid score for every id the batch carried.
-		const call: ScoreCall = vi.fn(async ({ user }) => {
-			const ids = [...user.matchAll(/^id: (\d+)$/gm)].map((m) => m[1]);
-			seenBatchSizes.push(ids.length);
-			return JSON.stringify(
+	// Echo a valid score for every id in the batch, with a fixed token usage.
+	const echoAll: ScoreCall = async ({ user }) => {
+		const ids = [...user.matchAll(/^id: (\d+)$/gm)].map((m) => m[1]);
+		return {
+			text: JSON.stringify(
 				ids.map((id) => ({ id, score: 5, reason: `reason ${id}` })),
-			);
-		});
+			),
+			usage: { inputTokens: 100, outputTokens: 20 },
+		};
+	};
 
-		const batches: number[] = [];
-		for await (const batch of scoreItems(items, "the niche", call)) {
-			batches.push(batch.length);
-		}
+	it("splits into ~10-Item batches and reports each batch's sent count", async () => {
+		const call = vi.fn(echoAll);
+
+		const batches = await collect(scoreItems(makeItems(23), "the niche", call));
 
 		expect(call).toHaveBeenCalledTimes(3);
-		expect(seenBatchSizes).toEqual([10, 10, 3]);
-		expect(batches).toEqual([10, 10, 3]);
+		expect(batches.map((b) => b.sent)).toEqual([10, 10, 3]);
+		expect(batches.map((b) => b.scores.length)).toEqual([10, 10, 3]);
+	});
+
+	it("carries the call's token usage on each yielded batch", async () => {
+		const [batch] = await collect(
+			scoreItems(makeItems(2), "the niche", echoAll),
+		);
+		expect(batch.usage).toEqual({ inputTokens: 100, outputTokens: 20 });
 	});
 
 	it("maps results back by echoed id, never by position", async () => {
-		const items = makeItems(2);
 		// Respond out of order; the parser must still attach scores to the right id.
-		const call: ScoreCall = async () =>
-			'[{"id":"2","score":8,"reason":"second"},{"id":"1","score":3,"reason":"first"}]';
+		const call: ScoreCall = async () => ({
+			text: '[{"id":"2","score":8,"reason":"second"},{"id":"1","score":3,"reason":"first"}]',
+			usage: null,
+		});
 
-		const [batch] = await collect(scoreItems(items, "the niche", call));
-		expect(batch).toEqual([
+		const [batch] = await collect(scoreItems(makeItems(2), "the niche", call));
+		expect(batch.scores).toEqual([
 			{ id: "2", score: 8, reason: "second" },
 			{ id: "1", score: 3, reason: "first" },
 		]);
 	});
 
 	it("fails only the throwing batch and keeps scoring the rest", async () => {
-		const items = makeItems(20);
 		let calls = 0;
-		const call: ScoreCall = async ({ user }) => {
+		const call: ScoreCall = async (prompt) => {
 			calls += 1;
 			if (calls === 1) throw new Error("transport error");
-			const ids = [...user.matchAll(/^id: (\d+)$/gm)].map((m) => m[1]);
-			return JSON.stringify(
-				ids.map((id) => ({ id, score: 5, reason: `reason ${id}` })),
-			);
+			return echoAll(prompt);
 		};
 
-		const batches = await collect(scoreItems(items, "the niche", call));
+		const batches = await collect(scoreItems(makeItems(20), "the niche", call));
 		expect(batches).toHaveLength(2);
-		expect(batches[0]).toEqual([]); // transport error -> empty, retry next sweep
-		expect(batches[1]).toHaveLength(10);
+		// transport error -> no scores, no usage, but the batch is still accounted for
+		expect(batches[0]).toEqual({ scores: [], usage: null, sent: 10 });
+		expect(batches[1].scores).toHaveLength(10);
 	});
 });
 

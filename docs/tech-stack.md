@@ -81,9 +81,13 @@ API does not provide these). Lightweight, no extra services.
 - **RSS / newsletter feeds** — keyless RSS reader.
 
 ### Fetch trigger — manual now, cron later
-A "Fetch now" server function runs fetch → insert → score-sweep on demand.
-Scheduled runs come later. The `score IS NULL` marker covers interrupted runs, so
-no always-on process is needed yet.
+A "Fetch now" server function runs fetch → insert → score-sweep on demand and
+streams progress back as a `ReadableStream` of events (TanStack Start multiplexes
+the stream to the client), driving a live progress bar plus a per-run cost summary
+from the token usage TanStack AI reports. Scores still reach the feed via Electric;
+the stream is just the ephemeral progress/cost UI. Scheduled runs come later. The
+`score IS NULL` marker covers interrupted runs, so no always-on process is needed
+yet.
 
 ### Local infra — Docker Compose
 `docker compose up` runs postgres + electric containers on the local machine

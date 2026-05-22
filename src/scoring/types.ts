@@ -23,3 +23,21 @@ export interface ScoreResult {
 	score: number;
 	reason: string;
 }
+
+/** Token usage TanStack AI reports for a single scoring call. */
+export interface BatchUsage {
+	inputTokens: number;
+	outputTokens: number;
+}
+
+/**
+ * The Scorer's output for one batch: the Scores it could extract, the token
+ * usage of the call (null when the call failed or reported none), and `sent` —
+ * how many Items rode in the batch — so the orchestrator can advance a precise
+ * progress bar even when some entries came back malformed.
+ */
+export interface ScoredBatch {
+	scores: ScoreResult[];
+	usage: BatchUsage | null;
+	sent: number;
+}

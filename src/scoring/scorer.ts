@@ -2,7 +2,12 @@ import { chat } from "@tanstack/ai";
 import { anthropicText } from "@tanstack/ai-anthropic";
 import { z } from "zod";
 import { SCORING_MODEL } from "../../models.config";
-import type { ScorableItem, ScoreResult } from "./types";
+import type {
+	BatchUsage,
+	ScorableItem,
+	ScoredBatch,
+	ScoreResult,
+} from "./types";
 
 /**
  * How many Items ride in one Haiku call. An internal Scorer detail, not user
@@ -11,8 +16,14 @@ import type { ScorableItem, ScoreResult } from "./types";
  */
 const SCORING_BATCH_SIZE = 10;
 
-/** A single scoring call: takes the assembled prompt, returns raw model text. */
-export type ScoreCall = (prompt: ScorePrompt) => Promise<string>;
+/** What a {@link ScoreCall} returns: the raw model text plus its token usage. */
+export interface ScoreCallResult {
+	text: string;
+	usage: BatchUsage | null;
+}
+
+/** A single scoring call: takes the assembled prompt, returns text + usage. */
+export type ScoreCall = (prompt: ScorePrompt) => Promise<ScoreCallResult>;
 
 /** The two halves of a scoring request handed to a {@link ScoreCall}. */
 export interface ScorePrompt {
@@ -128,25 +139,45 @@ function buildUserPrompt(batch: ScorableItem[]): string {
 		.join("\n\n---\n\n");
 }
 
-/** The real scoring call: a plain, non-agentic Haiku text completion. */
-const defaultCall: ScoreCall = ({ system, user }) =>
-	chat({
+/**
+ * The real scoring call: a plain, non-agentic Haiku text completion. A usage
+ * middleware captures the token counts TanStack AI surfaces on the run's
+ * `RUN_FINISHED` event (it fires even with `stream: false`) so the orchestrator
+ * can total a per-run cost.
+ */
+const defaultCall: ScoreCall = async ({ system, user }) => {
+	let usage: BatchUsage | null = null;
+	const text = await chat({
 		adapter: anthropicText(SCORING_MODEL),
 		systemPrompts: [system],
 		messages: [{ role: "user", content: user }],
 		stream: false,
 		maxTokens: 1024,
+		middleware: [
+			{
+				name: "scoring-usage",
+				onUsage: (_ctx, u) => {
+					usage = {
+						inputTokens: u.promptTokens,
+						outputTokens: u.completionTokens,
+					};
+				},
+			},
+		],
 	});
+	return { text, usage };
+};
 
 /**
- * Score every Item against the Niche, yielding one batch of Scores at a time so
- * the orchestrator can persist each batch the moment it lands and Electric can
- * stream it into the feed.
+ * Score every Item against the Niche, yielding one batch at a time so the
+ * orchestrator can persist each batch the moment it lands (Electric then streams
+ * it into the feed) and advance a progress bar. Each yield carries the call's
+ * token usage and how many Items it covered.
  *
  * Fault containment lives inside the generator: a throwing batch would abort the
  * caller's `for await` and starve the remaining batches, so each batch's call is
- * wrapped — a transport error yields an empty batch and the loop moves on, and
- * those Items stay `score IS NULL` to retry next sweep.
+ * wrapped — a transport error yields no Scores and the loop moves on, and those
+ * Items stay `score IS NULL` to retry next sweep.
  *
  * Pure aside from the injected `call` (defaulting to the real Haiku call), which
  * the parsing test replaces with a stub.
@@ -155,15 +186,18 @@ export async function* scoreItems(
 	items: ScorableItem[],
 	niche: string,
 	call: ScoreCall = defaultCall,
-): AsyncGenerator<ScoreResult[]> {
+): AsyncGenerator<ScoredBatch> {
 	const system = buildSystemPrompt(niche);
 	for (const batch of chunk(items, SCORING_BATCH_SIZE)) {
 		const sentIds = new Set(batch.map((item) => item.id));
 		try {
-			const text = await call({ system, user: buildUserPrompt(batch) });
-			yield parseScores(text, sentIds);
+			const { text, usage } = await call({
+				system,
+				user: buildUserPrompt(batch),
+			});
+			yield { scores: parseScores(text, sentIds), usage, sent: batch.length };
 		} catch {
-			yield [];
+			yield { scores: [], usage: null, sent: batch.length };
 		}
 	}
 }
