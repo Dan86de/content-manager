@@ -6,7 +6,10 @@ import { itemsCollection } from "#/collections/items";
 import { fetchNow } from "#/server/fetch";
 import type { PerSourceSummary } from "#/sources/types";
 
-export const Route = createFileRoute("/")({ component: Feed });
+// The feed reads from a browser-only Electric collection (useLiveQuery), so
+// there is nothing to server-render. Opt out of SSR for this route to avoid the
+// "Missing getServerSnapshot" warning and the silent fallback to client render.
+export const Route = createFileRoute("/")({ component: Feed, ssr: false });
 
 function Feed() {
 	const runFetch = useServerFn(fetchNow);
