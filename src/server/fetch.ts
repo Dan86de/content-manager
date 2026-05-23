@@ -30,14 +30,35 @@ export interface CostSummary {
 }
 
 /**
+ * Per-run tally of why Items did or didn't get a Score (the sum of every
+ * batch's {@link import("#/scoring/types").BatchOutcome}). `total` is the
+ * Items the sweep attempted, equal to `scored + omitted + validationDropped +
+ * parseFailed + batchErrored`. A confirmation aid: it surfaces the gap between
+ * Items sent and Items scored so we can see which bucket dominates.
+ */
+export interface OutcomeSummary {
+	total: number;
+	scored: number;
+	omitted: number;
+	validationDropped: number;
+	parseFailed: number;
+	batchErrored: number;
+}
+
+/**
  * A progress event streamed from {@link fetchNow} as a run unfolds: a Source
  * just finished fetching, the scoring sweep advanced, or the run is done (the
- * terminal event, carrying the full summary and cost).
+ * terminal event, carrying the full summary, cost, and scoring outcome).
  */
 export type FetchProgress =
 	| { phase: "fetch"; summary: PerSourceSummary }
 	| { phase: "score"; processed: number; total: number }
-	| { phase: "done"; summaries: PerSourceSummary[]; cost: CostSummary };
+	| {
+			phase: "done";
+			summaries: PerSourceSummary[];
+			cost: CostSummary;
+			outcome: OutcomeSummary;
+	  };
 
 /**
  * "Fetch now": pull Items from every Source, insert the new ones, then score
@@ -59,6 +80,14 @@ export const fetchNow = createServerFn({ method: "POST" }).handler(
 				let inputTokens = 0;
 				let outputTokens = 0;
 				let batches = 0;
+				const outcome: OutcomeSummary = {
+					total: 0,
+					scored: 0,
+					omitted: 0,
+					validationDropped: 0,
+					parseFailed: 0,
+					batchErrored: 0,
+				};
 
 				try {
 					for (const { source, fetch } of SOURCES) {
@@ -96,6 +125,12 @@ export const fetchNow = createServerFn({ method: "POST" }).handler(
 								inputTokens += batch.usage.inputTokens;
 								outputTokens += batch.usage.outputTokens;
 							}
+							outcome.total += batch.sent;
+							outcome.scored += batch.outcome.scored;
+							outcome.omitted += batch.outcome.omitted;
+							outcome.validationDropped += batch.outcome.validationDropped;
+							outcome.parseFailed += batch.outcome.parseFailed;
+							outcome.batchErrored += batch.outcome.batchErrored;
 							controller.enqueue({ phase: "score", processed, total });
 						}
 					} catch (error) {
@@ -111,6 +146,7 @@ export const fetchNow = createServerFn({ method: "POST" }).handler(
 							batches,
 							usd: estimateUsd(inputTokens, outputTokens),
 						},
+						outcome,
 					});
 					controller.close();
 				}

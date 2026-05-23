@@ -31,13 +31,32 @@ export interface BatchUsage {
 }
 
 /**
+ * Why each Item in a batch did or didn't get a Score — a per-run diagnostic
+ * that lets the summary show the gap between Items sent and Items scored.
+ * Mutually exclusive per Item: when the response parses, each sent Item is
+ * `scored`, `omitted` (the model returned no entry for it), or
+ * `validationDropped` (an entry came back but failed the schema). When the
+ * whole response is unparseable the batch counts as `parseFailed`, and when the
+ * call throws it counts as `batchErrored`. The five always sum to `sent`.
+ */
+export interface BatchOutcome {
+	scored: number;
+	omitted: number;
+	validationDropped: number;
+	parseFailed: number;
+	batchErrored: number;
+}
+
+/**
  * The Scorer's output for one batch: the Scores it could extract, the token
- * usage of the call (null when the call failed or reported none), and `sent` —
- * how many Items rode in the batch — so the orchestrator can advance a precise
- * progress bar even when some entries came back malformed.
+ * usage of the call (null when the call failed or reported none), `sent` — how
+ * many Items rode in the batch, so the orchestrator can advance a precise
+ * progress bar even when some entries came back malformed — and the per-Item
+ * {@link BatchOutcome} breakdown behind that count.
  */
 export interface ScoredBatch {
 	scores: ScoreResult[];
 	usage: BatchUsage | null;
 	sent: number;
+	outcome: BatchOutcome;
 }

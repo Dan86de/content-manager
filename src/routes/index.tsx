@@ -9,7 +9,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "#/components/ui/tooltip";
-import type { CostSummary } from "#/server/fetch";
+import type { CostSummary, OutcomeSummary } from "#/server/fetch";
 import { fetchNow } from "#/server/fetch";
 import type { PerSourceSummary } from "#/sources/types";
 
@@ -27,6 +27,7 @@ function Feed() {
 		total: number;
 	} | null>(null);
 	const [cost, setCost] = useState<CostSummary | null>(null);
+	const [outcome, setOutcome] = useState<OutcomeSummary | null>(null);
 
 	// The feed: most relevant first. Highest Score on top, unscored Items last,
 	// newest-first within a tie. Ordering lives here, not in the shape.
@@ -44,6 +45,7 @@ function Feed() {
 		setSummaries(null);
 		setScoring(null);
 		setCost(null);
+		setOutcome(null);
 		const liveSummaries: PerSourceSummary[] = [];
 		try {
 			const stream = await runFetch();
@@ -62,6 +64,7 @@ function Feed() {
 					case "done":
 						setSummaries(value.summaries);
 						setCost(value.cost);
+						setOutcome(value.outcome);
 						break;
 				}
 			}
@@ -125,6 +128,24 @@ function Feed() {
 									/>
 								</div>
 							</div>
+						)}
+
+						{outcome && outcome.total > 0 && (
+							<p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+								<span className="font-medium text-foreground tabular-nums">
+									Scored {outcome.scored} of {outcome.total}
+								</span>
+								{FAILURE_CATEGORIES.map(({ key, label }) =>
+									outcome[key] > 0 ? (
+										<span
+											key={key}
+											className="rounded-md bg-destructive/10 px-2 py-0.5 font-medium text-destructive text-xs tabular-nums"
+										>
+											{outcome[key]} {label}
+										</span>
+									) : null,
+								)}
+							</p>
 						)}
 
 						{cost && cost.batches > 0 && (
@@ -237,6 +258,19 @@ function Feed() {
 		</TooltipProvider>
 	);
 }
+
+// The four ways an Item can come back unscored, in the order they're worth
+// noticing. Rendered as warning chips only when their count is > 0, so a clean
+// run shows just "Scored X of Y" and nothing else.
+const FAILURE_CATEGORIES = [
+	{ key: "parseFailed", label: "parse-failed" },
+	{ key: "batchErrored", label: "errored" },
+	{ key: "omitted", label: "omitted" },
+	{ key: "validationDropped", label: "validation-dropped" },
+] as const satisfies ReadonlyArray<{
+	key: keyof OutcomeSummary;
+	label: string;
+}>;
 
 // Triage status colors, driven by the theme tokens. Single taupe hue, so the
 // new → kept → drafted progression is shown by increasing emphasis; dismissed
