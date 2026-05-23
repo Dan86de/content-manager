@@ -3,6 +3,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { type CSSProperties, useState } from "react";
 import { itemsCollection } from "#/collections/items";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "#/components/ui/tooltip";
 import type { CostSummary } from "#/server/fetch";
 import { fetchNow } from "#/server/fetch";
 import type { PerSourceSummary } from "#/sources/types";
@@ -65,150 +71,170 @@ function Feed() {
 	}
 
 	return (
-		<div className="mx-auto max-w-5xl p-8">
-			<header className="mb-6 flex items-center justify-between">
-				<h1 className="font-bold text-3xl">Feed</h1>
-				<button
-					type="button"
-					onClick={onFetchNow}
-					disabled={isFetching}
-					className="rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm disabled:opacity-50"
-				>
-					{isFetching ? "Fetching…" : "Fetch now"}
-				</button>
-			</header>
+		<TooltipProvider>
+			<div className="mx-auto max-w-5xl p-8">
+				<header className="mb-6 flex items-center justify-between">
+					<h1 className="font-bold text-3xl">Feed</h1>
+					<button
+						type="button"
+						onClick={onFetchNow}
+						disabled={isFetching}
+						className="rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm disabled:opacity-50"
+					>
+						{isFetching ? "Fetching…" : "Fetch now"}
+					</button>
+				</header>
 
-			{(summaries || scoring) && (
-				<section className="mb-6 space-y-3 rounded-lg border border-border bg-card p-4">
-					{summaries && (
-						<ul className="space-y-1 text-muted-foreground text-sm">
-							{summaries.map((s) => (
-								<li key={s.source} className="flex items-baseline gap-x-2">
-									<span className="font-medium text-foreground">
-										{s.source}
-									</span>
-									{s.error ? (
-										<span className="text-destructive">{s.error}</span>
-									) : (
-										<span className="tabular-nums">
-											fetched {s.fetched}, inserted {s.inserted}
+				{(summaries || scoring) && (
+					<section className="mb-6 space-y-3 rounded-lg border border-border bg-card p-4">
+						{summaries && (
+							<ul className="space-y-1 text-muted-foreground text-sm">
+								{summaries.map((s) => (
+									<li key={s.source} className="flex items-baseline gap-x-2">
+										<span className="font-medium text-foreground">
+											{s.source}
 										</span>
-									)}
-								</li>
-							))}
-						</ul>
-					)}
-
-					{scoring && scoring.total > 0 && (
-						<div>
-							<div className="mb-1.5 flex items-baseline justify-between text-sm">
-								<span className="font-medium text-foreground">Scoring</span>
-								<span className="text-muted-foreground tabular-nums">
-									{scoring.processed} / {scoring.total}
-								</span>
-							</div>
-							<div className="h-2 overflow-hidden rounded-full bg-muted">
-								<div
-									className="h-full w-(--scoring-progress) rounded-full bg-primary transition-[width] duration-500 ease-out"
-									style={
-										{
-											"--scoring-progress": `${(scoring.processed / scoring.total) * 100}%`,
-										} as CSSProperties
-									}
-								/>
-							</div>
-						</div>
-					)}
-
-					{cost && cost.batches > 0 && (
-						<p className="text-muted-foreground text-sm tabular-nums">
-							Scored {cost.batches} batch{cost.batches === 1 ? "" : "es"} ·{" "}
-							{cost.inputTokens.toLocaleString()} in /{" "}
-							{cost.outputTokens.toLocaleString()} out tokens ·{" "}
-							<span className="font-medium text-foreground">
-								~${cost.usd.toFixed(4)}
-							</span>
-						</p>
-					)}
-				</section>
-			)}
-
-			{items.length === 0 ? (
-				<p className="text-muted-foreground">No Items yet. Hit “Fetch now”.</p>
-			) : (
-				<div className="-mx-8 -my-2 overflow-x-auto whitespace-nowrap">
-					<div className="inline-block min-w-full px-8 py-2 align-middle">
-						<table className="w-full text-left text-sm">
-							<thead>
-								<tr className="border-border border-b text-muted-foreground">
-									<th className="whitespace-nowrap py-2 pr-4 font-medium">
-										Title
-									</th>
-									<th className="whitespace-nowrap py-2 pr-4 font-medium">
-										Source
-									</th>
-									<th className="whitespace-nowrap py-2 pr-4 font-medium">
-										Author
-									</th>
-									<th className="whitespace-nowrap py-2 pr-4 font-medium">
-										Published
-									</th>
-									<th className="whitespace-nowrap py-2 pr-4 font-medium">
-										Status
-									</th>
-									<th className="whitespace-nowrap py-2 text-right font-medium">
-										Score
-									</th>
-								</tr>
-							</thead>
-							<tbody>
-								{items.map((item) => (
-									<tr
-										key={item.id}
-										className="relative border-border border-b hover:bg-muted"
-									>
-										<td className="max-w-md py-3 pr-4">
-											<a
-												href={item.url}
-												target="_blank"
-												rel="noreferrer"
-												className="font-medium text-foreground after:absolute after:inset-0 hover:underline"
-											>
-												<span className="block truncate">{item.title}</span>
-											</a>
-											{item.score_reason && (
-												<span className="block truncate text-muted-foreground text-xs">
-													{item.score_reason}
-												</span>
-											)}
-										</td>
-										<td className="py-3 pr-4">
-											<span className="rounded-md bg-secondary px-2 py-0.5 font-medium text-secondary-foreground text-xs">
-												{item.source}
+										{s.error ? (
+											<span className="text-destructive">{s.error}</span>
+										) : (
+											<span className="tabular-nums">
+												fetched {s.fetched}, inserted {s.inserted}
 											</span>
-										</td>
-										<td className="py-3 pr-4 text-muted-foreground">
-											{item.author ?? "—"}
-										</td>
-										<td className="py-3 pr-4 text-muted-foreground">
-											{new Date(item.published_at).toLocaleDateString()}
-										</td>
-										<td className="py-3 pr-4">
-											<StatusBadge status={item.status} />
-										</td>
-										<td className="py-3 text-right text-foreground tabular-nums">
-											{item.score ?? (
-												<span className="text-muted-foreground">—</span>
-											)}
-										</td>
-									</tr>
+										)}
+									</li>
 								))}
-							</tbody>
-						</table>
+							</ul>
+						)}
+
+						{scoring && scoring.total > 0 && (
+							<div>
+								<div className="mb-1.5 flex items-baseline justify-between text-sm">
+									<span className="font-medium text-foreground">Scoring</span>
+									<span className="text-muted-foreground tabular-nums">
+										{scoring.processed} / {scoring.total}
+									</span>
+								</div>
+								<div className="h-2 overflow-hidden rounded-full bg-muted">
+									<div
+										className="h-full w-(--scoring-progress) rounded-full bg-primary transition-[width] duration-500 ease-out"
+										style={
+											{
+												"--scoring-progress": `${(scoring.processed / scoring.total) * 100}%`,
+											} as CSSProperties
+										}
+									/>
+								</div>
+							</div>
+						)}
+
+						{cost && cost.batches > 0 && (
+							<p className="text-muted-foreground text-sm tabular-nums">
+								Scored {cost.batches} batch{cost.batches === 1 ? "" : "es"} ·{" "}
+								{cost.inputTokens.toLocaleString()} in /{" "}
+								{cost.outputTokens.toLocaleString()} out tokens ·{" "}
+								<span className="font-medium text-foreground">
+									~${cost.usd.toFixed(4)}
+								</span>
+							</p>
+						)}
+					</section>
+				)}
+
+				{items.length === 0 ? (
+					<p className="text-muted-foreground">
+						No Items yet. Hit “Fetch now”.
+					</p>
+				) : (
+					<div className="-mx-8 -my-2 overflow-x-auto whitespace-nowrap">
+						<div className="inline-block min-w-full px-8 py-2 align-middle">
+							<table className="w-full text-left text-sm">
+								<thead>
+									<tr className="border-border border-b text-muted-foreground">
+										<th className="whitespace-nowrap py-2 pr-4 font-medium">
+											Title
+										</th>
+										<th className="whitespace-nowrap py-2 pr-4 font-medium">
+											Source
+										</th>
+										<th className="whitespace-nowrap py-2 pr-4 font-medium">
+											Author
+										</th>
+										<th className="whitespace-nowrap py-2 pr-4 font-medium">
+											Published
+										</th>
+										<th className="whitespace-nowrap py-2 pr-4 font-medium">
+											Status
+										</th>
+										<th className="whitespace-nowrap py-2 text-right font-medium">
+											Score
+										</th>
+									</tr>
+								</thead>
+								<tbody>
+									{items.map((item) => (
+										<tr
+											key={item.id}
+											className="relative border-border border-b hover:bg-muted"
+										>
+											<td className="max-w-md py-3 pr-4">
+												<a
+													href={item.url}
+													target="_blank"
+													rel="noreferrer"
+													className="font-medium text-foreground after:absolute after:inset-0 hover:underline"
+												>
+													<span className="block truncate">{item.title}</span>
+												</a>
+												{item.score_reason && (
+													<Tooltip>
+														<TooltipTrigger asChild>
+															<a
+																href={item.url}
+																target="_blank"
+																rel="noreferrer"
+																className="relative z-10 block truncate text-muted-foreground text-xs hover:text-foreground"
+															>
+																{item.score_reason}
+															</a>
+														</TooltipTrigger>
+														<TooltipContent
+															side="bottom"
+															align="start"
+															className="max-w-md whitespace-normal text-sm"
+														>
+															{item.score_reason}
+														</TooltipContent>
+													</Tooltip>
+												)}
+											</td>
+											<td className="py-3 pr-4">
+												<span className="rounded-md bg-secondary px-2 py-0.5 font-medium text-secondary-foreground text-xs">
+													{item.source}
+												</span>
+											</td>
+											<td className="py-3 pr-4 text-muted-foreground">
+												{item.author ?? "—"}
+											</td>
+											<td className="py-3 pr-4 text-muted-foreground">
+												{new Date(item.published_at).toLocaleDateString()}
+											</td>
+											<td className="py-3 pr-4">
+												<StatusBadge status={item.status} />
+											</td>
+											<td className="py-3 text-right text-foreground tabular-nums">
+												{item.score ?? (
+													<span className="text-muted-foreground">—</span>
+												)}
+											</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						</div>
 					</div>
-				</div>
-			)}
-		</div>
+				)}
+			</div>
+		</TooltipProvider>
 	);
 }
 

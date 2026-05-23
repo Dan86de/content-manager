@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@electric-sql/client": "^1.5.18",
+    "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/ai": "latest",
     "@tanstack/ai-anthropic": "latest",
