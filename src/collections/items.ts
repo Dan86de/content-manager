@@ -1,6 +1,7 @@
 import { electricCollectionOptions } from "@tanstack/electric-db-collection";
 import { createCollection } from "@tanstack/react-db";
 import { z } from "zod";
+import { setItemStatus } from "#/server/triage";
 
 /**
  * An Item as it arrives over the Electric shape (raw `items` row). Electric's
@@ -26,10 +27,11 @@ export const itemSchema = z.object({
 export type Item = z.infer<typeof itemSchema>;
 
 /**
- * Live, read-only collection backed by an Electric shape over the whole `items`
- * table (all columns, no WHERE). Ordering and every future filter live in the
- * TanStack DB live query, not the shape. Reads hit Electric directly from the
- * browser; all writes go through server functions.
+ * Live collection backed by an Electric shape over the whole `items` table (all
+ * columns, no WHERE). Ordering and every filter live in the TanStack DB live
+ * query, not the shape. Reads hit Electric directly from the browser; the only
+ * write is a triage `status` change, applied optimistically here and persisted
+ * through the {@link setItemStatus} server function.
  */
 export const itemsCollection = createCollection(
 	electricCollectionOptions({
@@ -39,6 +41,20 @@ export const itemsCollection = createCollection(
 		shapeOptions: {
 			url: `${import.meta.env.VITE_ELECTRIC_URL}/v1/shape`,
 			params: { table: "items" },
+		},
+		// The only mutation is a triage transition. Persist each changed Item's
+		// new status and hand the write's txid back so Electric can discard the
+		// optimistic state once that transaction streams in over the shape.
+		onUpdate: async ({ transaction }) => {
+			const txid = await Promise.all(
+				transaction.mutations.map(async ({ key, modified }) => {
+					const { txid } = await setItemStatus({
+						data: { id: String(key), status: modified.status },
+					});
+					return txid;
+				}),
+			);
+			return { txid };
 		},
 	}),
 );

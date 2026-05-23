@@ -1,4 +1,4 @@
-import { useLiveQuery } from "@tanstack/react-db";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { type CSSProperties, useState } from "react";
@@ -29,14 +29,35 @@ function Feed() {
 	const [cost, setCost] = useState<CostSummary | null>(null);
 	const [outcome, setOutcome] = useState<OutcomeSummary | null>(null);
 
-	// The feed: most relevant first. Highest Score on top, unscored Items last,
-	// newest-first within a tie. Ordering lives here, not in the shape.
-	const { data: items } = useLiveQuery((q) =>
-		q
-			.from({ item: itemsCollection })
-			.orderBy(({ item }) => item.score, { direction: "desc", nulls: "last" })
-			.orderBy(({ item }) => item.published_at, "desc"),
+	// Which triage status the feed is scoped to. Defaults to `new` — the
+	// un-triaged Items — and switches to revisit kept / dismissed / drafted ones.
+	const [status, setStatus] = useState<TriageStatus>("new");
+
+	// The feed, scoped to the active status: most relevant first. Highest Score
+	// on top, unscored Items last, newest-first within a tie. The status filter
+	// and ordering live here in the live query, not in the Electric shape.
+	const { data: items } = useLiveQuery(
+		(q) =>
+			q
+				.from({ item: itemsCollection })
+				.where(({ item }) => eq(item.status, status))
+				.orderBy(({ item }) => item.score, {
+					direction: "desc",
+					nulls: "last",
+				})
+				.orderBy(({ item }) => item.published_at, "desc"),
+		[status],
 	);
+
+	// Optimistically move an Item to a new triage status. TanStack DB applies the
+	// change locally at once (the row leaves the current view) and persists it via
+	// the collection's onUpdate handler, reconciling against Postgres through
+	// Electric. Illegal transitions are rejected server-side and rolled back.
+	function triage(id: string, next: TriageStatus) {
+		itemsCollection.update(id, (draft) => {
+			draft.status = next;
+		});
+	}
 
 	// Drive the progress bar + cost panel off the event stream fetchNow returns.
 	// The Scores themselves arrive separately, streamed into the feed by Electric.
@@ -87,6 +108,23 @@ function Feed() {
 						{isFetching ? "Fetching…" : "Fetch now"}
 					</button>
 				</header>
+
+				<nav className="mb-6 inline-flex gap-1 rounded-lg bg-muted p-1">
+					{STATUS_FILTERS.map((filter) => (
+						<button
+							key={filter}
+							type="button"
+							onClick={() => setStatus(filter)}
+							className={`rounded-md px-3 py-1 font-medium text-sm capitalize transition-colors ${
+								status === filter
+									? "bg-card text-foreground shadow-sm"
+									: "text-muted-foreground hover:text-foreground"
+							}`}
+						>
+							{filter}
+						</button>
+					))}
+				</nav>
 
 				{(summaries || scoring) && (
 					<section className="mb-6 space-y-3 rounded-lg border border-border bg-card p-4">
@@ -163,7 +201,9 @@ function Feed() {
 
 				{items.length === 0 ? (
 					<p className="text-muted-foreground">
-						No Items yet. Hit “Fetch now”.
+						{status === "new"
+							? "No new Items. Hit “Fetch now”."
+							: `No ${status} Items.`}
 					</p>
 				) : (
 					<div className="-mx-8 -my-2 overflow-x-auto whitespace-nowrap">
@@ -186,8 +226,11 @@ function Feed() {
 										<th className="whitespace-nowrap py-2 pr-4 font-medium">
 											Status
 										</th>
-										<th className="whitespace-nowrap py-2 text-right font-medium">
+										<th className="whitespace-nowrap py-2 pr-4 text-right font-medium">
 											Score
+										</th>
+										<th className="whitespace-nowrap py-2 text-right font-medium">
+											Actions
 										</th>
 									</tr>
 								</thead>
@@ -242,10 +285,17 @@ function Feed() {
 											<td className="py-3 pr-4">
 												<StatusBadge status={item.status} />
 											</td>
-											<td className="py-3 text-right text-foreground tabular-nums">
+											<td className="py-3 pr-4 text-right text-foreground tabular-nums">
 												{item.score ?? (
 													<span className="text-muted-foreground">—</span>
 												)}
+											</td>
+											<td className="py-3 text-right">
+												<TriageActions
+													status={item.status}
+													onKeep={() => triage(item.id, "kept")}
+													onDismiss={() => triage(item.id, "dismissed")}
+												/>
 											</td>
 										</tr>
 									))}
@@ -271,6 +321,58 @@ const FAILURE_CATEGORIES = [
 	key: keyof OutcomeSummary;
 	label: string;
 }>;
+
+// The four triage statuses, in workflow order — the feed's scoped views and the
+// default (`new`, first). Kept in sync with the CHECK constraint and ADR-0001.
+type TriageStatus = "new" | "kept" | "dismissed" | "drafted";
+const STATUS_FILTERS = [
+	"new",
+	"kept",
+	"dismissed",
+	"drafted",
+] as const satisfies readonly TriageStatus[];
+
+// The triage actions available from a row, per the state machine (ADR-0001):
+// Keep shortlists a `new` Item; Dismiss removes a `new` or `kept` one. `drafted`
+// and `dismissed` are terminal, so they offer no actions. The buttons sit above
+// the row-spanning title link (z-10) so clicks reach them, not the link.
+function TriageActions({
+	status,
+	onKeep,
+	onDismiss,
+}: {
+	status: string;
+	onKeep: () => void;
+	onDismiss: () => void;
+}) {
+	const canKeep = status === "new";
+	const canDismiss = status === "new" || status === "kept";
+	if (!canKeep && !canDismiss) {
+		return <span className="text-muted-foreground">—</span>;
+	}
+	return (
+		<div className="relative z-10 flex justify-end gap-2">
+			{canKeep && (
+				<button
+					type="button"
+					onClick={onKeep}
+					className="rounded-md bg-secondary px-2.5 py-1 font-medium text-secondary-foreground text-xs hover:bg-secondary/80"
+				>
+					Keep
+				</button>
+			)}
+			{canDismiss && (
+				<button
+					type="button"
+					onClick={onDismiss}
+					className="rounded-md px-2.5 py-1 font-medium text-muted-foreground text-xs hover:bg-muted-foreground/10 hover:text-foreground"
+				>
+					Dismiss
+				</button>
+			)}
+		</div>
+	);
+}
 
 // Triage status colors, driven by the theme tokens. Single taupe hue, so the
 // new → kept → drafted progression is shown by increasing emphasis; dismissed
