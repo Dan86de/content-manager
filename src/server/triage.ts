@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { TriageStatus } from "#/collections/items";
 import { setStatus } from "#/db/repository";
 
 /** The triage transition a Keep / Dismiss action requests on one Item. */
 interface SetItemStatusInput {
 	id: string;
-	status: string;
+	status: TriageStatus;
 }
 
 /**

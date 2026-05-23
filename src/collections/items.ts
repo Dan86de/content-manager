@@ -4,6 +4,20 @@ import { z } from "zod";
 import { setItemStatus } from "#/server/triage";
 
 /**
+ * The four triage statuses, in workflow order (`new` first, the default for the
+ * feed). Backed by the `items.status` CHECK constraint and the state machine in
+ * ADR-0001; this order also drives the feed's status-filter nav.
+ */
+export const triageStatusSchema = z.enum([
+	"new",
+	"kept",
+	"dismissed",
+	"drafted",
+]);
+
+export type TriageStatus = z.infer<typeof triageStatusSchema>;
+
+/**
  * An Item as it arrives over the Electric shape (raw `items` row). Electric's
  * default parser yields numbers for integers and strings for everything else,
  * including the timestamptz columns.
@@ -17,7 +31,7 @@ export const itemSchema = z.object({
 	author: z.string().nullable(),
 	published_at: z.string(),
 	raw_text: z.string().nullable(),
-	status: z.string(),
+	status: triageStatusSchema,
 	score: z.number().nullable(),
 	score_reason: z.string().nullable(),
 	draft_path: z.string().nullable(),
