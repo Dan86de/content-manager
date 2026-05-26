@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/">
+	<channel>
+		<title>Claude Code Daily</title>
+		<link>https://claudecodedaily.com</link>
+		<item>
+			<title>Claude Code tips for agents</title>
+			<link>https://claudecodedaily.com/claude-code-tips</link>
+			<guid isPermaLink="true">https://claudecodedaily.com/claude-code-tips</guid>
+			<dc:creator>Dana</dc:creator>
+			<description>A short blurb that gets truncated.</description>
+			<content:encoded><![CDATA[<p>The full body of the article about agents.</p>]]></content:encoded>
+			<pubDate>Mon, 20 May 2024 12:00:00 GMT</pubDate>
+		</item>
+		<item>
+			<title>Entry without a guid</title>
+			<link>https://claudecodedaily.com/no-guid</link>
+			<pubDate>Mon, 20 May 2024 18:00:00 GMT</pubDate>
+		</item>
+		<item>
+			<title>Stale newsletter issue</title>
+			<link>https://claudecodedaily.com/stale</link>
+			<guid isPermaLink="true">https://claudecodedaily.com/stale</guid>
+			<pubDate>Sat, 18 May 2024 00:00:00 GMT</pubDate>
+		</item>
+		<item>
+			<title>Undated entry</title>
+			<link>https://claudecodedaily.com/undated</link>
+			<guid isPermaLink="true">https://claudecodedaily.com/undated</guid>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,36 @@
+{
+	"items": [
+		{
+			"snippet": {
+				"title": "Building agents with the Claude Agent SDK",
+				"description": "A walkthrough of the Agent SDK.",
+				"videoOwnerChannelTitle": "Anthropic"
+			},
+			"contentDetails": {
+				"videoId": "vid111",
+				"videoPublishedAt": "2024-05-20T12:00:00.000Z"
+			}
+		},
+		{
+			"snippet": {
+				"title": "Old MCP deep dive",
+				"description": "Posted two days ago.",
+				"videoOwnerChannelTitle": "Anthropic"
+			},
+			"contentDetails": {
+				"videoId": "vid222",
+				"videoPublishedAt": "2024-05-19T00:00:00.000Z"
+			}
+		},
+		{
+			"snippet": {
+				"title": "Untitled upload",
+				"description": ""
+			},
+			"contentDetails": {
+				"videoId": "vid333",
+				"videoPublishedAt": "2024-05-20T18:00:00.000Z"
+			}
+		}
+	]
+}

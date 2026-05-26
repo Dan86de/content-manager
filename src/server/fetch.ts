@@ -4,8 +4,17 @@ import { estimateUsd } from "#/scoring/cost";
 import { loadNiche } from "#/scoring/niche";
 import { scoreItems } from "#/scoring/scorer";
 import { fetchHackerNews } from "#/sources/hackernews";
+import { fetchRss } from "#/sources/rss";
 import type { NormalizedItem, PerSourceSummary } from "#/sources/types";
-import { HACKERNEWS, HN_KEYWORDS } from "../../sources.config";
+import { fetchYouTube } from "#/sources/youtube";
+import {
+	HACKERNEWS,
+	HN_KEYWORDS,
+	RSS,
+	RSS_FEEDS,
+	YOUTUBE,
+	YOUTUBE_CHANNELS,
+} from "../../sources.config";
 
 /**
  * A Source the run pulls from. The list is the only thing that grows as Sources
@@ -18,6 +27,8 @@ interface SourceFetcher {
 
 const SOURCES: SourceFetcher[] = [
 	{ source: HACKERNEWS, fetch: () => fetchHackerNews(HN_KEYWORDS) },
+	{ source: YOUTUBE, fetch: () => fetchYouTube(YOUTUBE_CHANNELS) },
+	{ source: RSS, fetch: () => fetchRss(RSS_FEEDS) },
 ];
 
 /** Token totals and estimated USD for one run's scoring calls. */
