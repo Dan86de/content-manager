@@ -38,9 +38,6 @@ export function FeedTable({
 									Source
 								</th>
 								<th className="whitespace-nowrap py-2 pr-4 font-medium">
-									Author
-								</th>
-								<th className="whitespace-nowrap py-2 pr-4 font-medium">
 									Published
 								</th>
 								<th className="whitespace-nowrap py-2 pr-4 font-medium">

@@ -56,7 +56,6 @@ export function FeedRow({
 					{item.source}
 				</span>
 			</td>
-			<td className="py-3 pr-4 text-muted-foreground">{item.author ?? "—"}</td>
 			<td className="py-3 pr-4 text-muted-foreground">
 				{new Date(item.published_at).toLocaleDateString()}
 			</td>

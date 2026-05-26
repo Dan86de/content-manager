@@ -22,6 +22,7 @@ this doc is only about *how* it's built.
 | Drafting model | Claude Opus (agent with TanStack AI tool-calling) |
 | Article extraction | `@extractus/article-extractor` |
 | Transcript extraction | `youtube-transcript` |
+| RSS / feed parsing | `rss-parser` |
 | Frontmatter (Voice / Draft files) | `gray-matter` |
 | Config & secrets | env vars via `.env` |
 | Local infra | Docker Compose (postgres + electric containers) |
@@ -76,9 +77,16 @@ article text) and `youtube-transcript` (timedtext transcripts — the YouTube Da
 API does not provide these). Lightweight, no extra services.
 
 ### Sources (initial) — YouTube Data API v3, keyless HN, keyless RSS
-- **YouTube** — Data API v3 (keyed) for richer channel data.
+- **YouTube** — Data API v3 (keyed) via raw `fetch` (no `googleapis` dep — one
+  endpoint, keeps the normalize fn trivially fixture-testable). One
+  `playlistItems.list` per channel against its uploads playlist (channel id
+  `UC…` → `UU…`), not `search.list`, to spend ~1 quota unit/channel of the
+  10k/day budget.
 - **HackerNews** — keyless via the Algolia Search API.
-- **RSS / newsletter feeds** — keyless RSS reader.
+- **RSS / newsletter feeds** — keyless, parsed with `rss-parser`
+  (`parseString` keeps tests offline/fixture-driven and absorbs RSS-2.0-vs-Atom
+  variance). Chosen over `@extractus/feed-extractor` whose URL-first `extract`
+  would push tests toward network mocking.
 
 ### Fetch trigger — manual now, cron later
 A "Fetch now" server function runs fetch → insert → score-sweep on demand and

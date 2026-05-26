@@ -9,7 +9,7 @@ A single piece of content pulled from a source, normalized into a common shape (
 _Avoid_: post, entry, row, result
 
 **Source**:
-An external feed an Item comes from — HackerNews, a subreddit, a YouTube channel, or an RSS/newsletter feed.
+A *kind* of external feed Items come from — HackerNews, a subreddit, YouTube, or RSS/newsletter. Each Item records which Source it came from. Within a Source, several individual feeds may be configured (e.g. many YouTube channels, several RSS URLs); v1 does not model those individually — an Item knows it is a YouTube or RSS Item, but the specific channel/feed survives only in its url/author.
 _Avoid_: platform, channel (channel means a YouTube channel specifically), feed (feed = the dashboard list of Items)
 
 **Niche**:
@@ -48,3 +48,4 @@ Obtaining the best available content body for an Item at Draft time — the link
 
 - "Draft" is both a noun (the generated file) and the verb action (`kept -> drafted`). Kept distinct by context.
 - Keep is a **mandatory** step before Draft — you cannot Draft a `new` Item directly.
+- "Source" names a *kind* of feed (YouTube, RSS), not an individual channel or feed URL. The latter are configured but not modeled as distinct Sources in v1 — resolved: an Item's Source is its kind; its specific channel/feed lives only in url/author.
