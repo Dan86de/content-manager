@@ -2,6 +2,8 @@ import { chat } from "@tanstack/ai";
 import { anthropicText } from "@tanstack/ai-anthropic";
 import { z } from "zod";
 import { SCORING_MODEL } from "../../models.config";
+import { logUsage } from "./cost";
+import { withRetry } from "./retry";
 import type {
 	BatchOutcome,
 	BatchUsage,
@@ -198,29 +200,37 @@ function buildUserPrompt(batch: ScorableItem[]): string {
  * middleware captures the token counts TanStack AI surfaces on the run's
  * `RUN_FINISHED` event (it fires even with `stream: false`) so the orchestrator
  * can total a per-run cost.
+ *
+ * Wrapped in {@link withRetry}: Claude returns 429/529 under load, and `chat()`
+ * throws those as a plain `Error` with no status, so we retry any throw with
+ * backoff. A call that exhausts its retries propagates, and the batch loop
+ * below turns it into `batchErrored` (those Items stay `score IS NULL`). Each
+ * successful call logs its token usage so per-call cost is visible.
  */
-const defaultCall: ScoreCall = async ({ system, user }) => {
-	let usage: BatchUsage | null = null;
-	const text = await chat({
-		adapter: anthropicText(SCORING_MODEL),
-		systemPrompts: [system],
-		messages: [{ role: "user", content: user }],
-		stream: false,
-		maxTokens: 1024,
-		middleware: [
-			{
-				name: "scoring-usage",
-				onUsage: (_ctx, u) => {
-					usage = {
-						inputTokens: u.promptTokens,
-						outputTokens: u.completionTokens,
-					};
+const defaultCall: ScoreCall = ({ system, user }) =>
+	withRetry(async () => {
+		let usage: BatchUsage | null = null;
+		const text = await chat({
+			adapter: anthropicText(SCORING_MODEL),
+			systemPrompts: [system],
+			messages: [{ role: "user", content: user }],
+			stream: false,
+			maxTokens: 1024,
+			middleware: [
+				{
+					name: "scoring-usage",
+					onUsage: (_ctx, u) => {
+						usage = {
+							inputTokens: u.promptTokens,
+							outputTokens: u.completionTokens,
+						};
+					},
 				},
-			},
-		],
+			],
+		});
+		logUsage(SCORING_MODEL, usage);
+		return { text, usage };
 	});
-	return { text, usage };
-};
 
 /** A zero {@link BatchOutcome} with the given buckets filled in. */
 function makeOutcome(partial: Partial<BatchOutcome>): BatchOutcome {

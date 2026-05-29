@@ -18,11 +18,14 @@ export interface NormalizedItem {
 
 /**
  * Per-Source outcome of a "Fetch now" run. One failing Source carries its error
- * here instead of aborting the whole run.
+ * here instead of aborting the whole run. `failed` distinguishes a broken
+ * Source (its fetch threw) from a merely quiet one (fetched nothing, no error),
+ * so the results panel can tell them apart.
  */
 export interface PerSourceSummary {
 	source: string;
 	fetched: number;
 	inserted: number;
+	failed: boolean;
 	error?: string;
 }

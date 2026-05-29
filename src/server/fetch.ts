@@ -1,35 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { insertNew, setScores, unscoredItems } from "#/db/repository";
-import { estimateUsd } from "#/scoring/cost";
-import { loadNiche } from "#/scoring/niche";
-import { scoreItems } from "#/scoring/scorer";
-import { fetchHackerNews } from "#/sources/hackernews";
-import { fetchRss } from "#/sources/rss";
-import type { NormalizedItem, PerSourceSummary } from "#/sources/types";
-import { fetchYouTube } from "#/sources/youtube";
-import {
-	HACKERNEWS,
-	HN_KEYWORDS,
-	RSS,
-	RSS_FEEDS,
-	YOUTUBE,
-	YOUTUBE_CHANNELS,
-} from "../../sources.config";
-
-/**
- * A Source the run pulls from. The list is the only thing that grows as Sources
- * are added (reddit, youtube, rss); the orchestration around it stays the same.
- */
-interface SourceFetcher {
-	source: string;
-	fetch: () => Promise<NormalizedItem[]>;
-}
-
-const SOURCES: SourceFetcher[] = [
-	{ source: HACKERNEWS, fetch: () => fetchHackerNews(HN_KEYWORDS) },
-	{ source: YOUTUBE, fetch: () => fetchYouTube(YOUTUBE_CHANNELS) },
-	{ source: RSS, fetch: () => fetchRss(RSS_FEEDS) },
-];
+import type { PerSourceSummary } from "#/sources/types";
+import { realDeps, runFetch } from "./run-fetch";
 
 /** Token totals and estimated USD for one run's scoring calls. */
 export interface CostSummary {
@@ -72,95 +43,23 @@ export type FetchProgress =
 	  };
 
 /**
- * "Fetch now": pull Items from every Source, insert the new ones, then score
- * the whole `score IS NULL` sweep against the Niche — streaming progress as it
- * goes. Each Source is fault-isolated (one failing fetch records its error and
- * the run continues), and the scoring sweep is wrapped so a scoring failure
- * never fails the run; the terminal `done` event always lands with whatever was
- * fetched and scored.
+ * "Fetch now" as a server function: drives {@link runFetch} with the real deps
+ * and pipes its events into a {@link ReadableStream} for the route to read. The
+ * actual Scores still reach the feed via Electric as each batch is persisted;
+ * this stream drives the ephemeral progress bar and per-run cost summary.
  *
- * Returns a {@link ReadableStream} of {@link FetchProgress} events. The actual
- * Scores still reach the feed via Electric as each batch is persisted; this
- * stream drives the ephemeral progress bar and per-run cost summary.
+ * The orchestration core and its server-only deps live in `./run-fetch`,
+ * imported only here inside the handler, so the DB layer (and `pg`) never reach
+ * the client bundle.
  */
 export const fetchNow = createServerFn({ method: "POST" }).handler(
 	async (): Promise<ReadableStream<FetchProgress>> => {
 		return new ReadableStream<FetchProgress>({
 			async start(controller) {
-				const summaries: PerSourceSummary[] = [];
-				let inputTokens = 0;
-				let outputTokens = 0;
-				let batches = 0;
-				const outcome: OutcomeSummary = {
-					total: 0,
-					scored: 0,
-					omitted: 0,
-					validationDropped: 0,
-					parseFailed: 0,
-					batchErrored: 0,
-				};
-
-				try {
-					for (const { source, fetch } of SOURCES) {
-						let summary: PerSourceSummary;
-						try {
-							const items = await fetch();
-							const inserted = await insertNew(items);
-							summary = { source, fetched: items.length, inserted };
-						} catch (error) {
-							summary = {
-								source,
-								fetched: 0,
-								inserted: 0,
-								error: error instanceof Error ? error.message : String(error),
-							};
-						}
-						summaries.push(summary);
-						controller.enqueue({ phase: "fetch", summary });
-					}
-
-					// One global scoring sweep over every `score IS NULL` Item. Each
-					// batch is persisted immediately (Electric streams it into the feed)
-					// and reported here so the bar advances by Items actually attempted.
-					try {
-						const niche = await loadNiche();
-						const items = await unscoredItems();
-						const total = items.length;
-						let processed = 0;
-						controller.enqueue({ phase: "score", processed, total });
-						for await (const batch of scoreItems(items, niche)) {
-							await setScores(batch.scores);
-							processed += batch.sent;
-							batches += 1;
-							if (batch.usage) {
-								inputTokens += batch.usage.inputTokens;
-								outputTokens += batch.usage.outputTokens;
-							}
-							outcome.total += batch.sent;
-							outcome.scored += batch.outcome.scored;
-							outcome.omitted += batch.outcome.omitted;
-							outcome.validationDropped += batch.outcome.validationDropped;
-							outcome.parseFailed += batch.outcome.parseFailed;
-							outcome.batchErrored += batch.outcome.batchErrored;
-							controller.enqueue({ phase: "score", processed, total });
-						}
-					} catch (error) {
-						console.error("scoring sweep failed", error);
-					}
-				} finally {
-					controller.enqueue({
-						phase: "done",
-						summaries,
-						cost: {
-							inputTokens,
-							outputTokens,
-							batches,
-							usd: estimateUsd(inputTokens, outputTokens),
-						},
-						outcome,
-					});
-					controller.close();
+				for await (const event of runFetch(realDeps)) {
+					controller.enqueue(event);
 				}
+				controller.close();
 			},
 		});
 	},

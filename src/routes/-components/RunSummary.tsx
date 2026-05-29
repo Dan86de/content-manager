@@ -40,8 +40,8 @@ export function RunSummary({
 					{summaries.map((s) => (
 						<li key={s.source} className="flex items-baseline gap-x-2">
 							<span className="font-medium text-foreground">{s.source}</span>
-							{s.error ? (
-								<span className="text-destructive">{s.error}</span>
+							{s.failed ? (
+								<span className="text-destructive">{s.error ?? "failed"}</span>
 							) : (
 								<span className="tabular-nums">
 									fetched {s.fetched}, inserted {s.inserted}
